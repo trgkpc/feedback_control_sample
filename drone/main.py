@@ -9,120 +9,120 @@ import matplotlib.animation as animation
 import subprocess as sp
 fig = plt.figure()
 
-##### 設定 ####
-draw_cycle = 10         # 描画周期と制御周期の比率(整数)
-interval_ms = 10        # 制御周期[ms]
-T = 10.0                # シミュレーション時間[s]
-
-#### 内部変数の初期化 ####
-dt = interval_ms * 1e-3 # 制御周期[s]
-t = 0.0                 # 現在時刻[s]
-x0 = [200., 0.]         # 初期状態
-x = np.array(x0)        # 状態
-y0 = 1500.0             # 目標高さ
-controller = lambda:0.  # 制御器
-
-def initialize(): # 再初期化の際に呼ぶ関数
-    global t,x
-    t  = 0.0
-    x = np.array(x0)
-
 #### 系の定義 ####
-def eos(x, u):
+def eos(state, u):
     # 状態方程式
     # Equation Of State
-    y,v = x
+    y,v = state
     a = u - 0.9*v - 1000.0
     return np.array([v, a])
 
-def runge_kutta(x, u, h):
+
+def runge_kutta(f, x, u, h):
     # ルンゲ食った方
     # ルンゲを食ってない方もあるかもしれない
-    k1 = eos(x           , u)
-    k2 = eos(x + (h/2)*k1, u)
-    k3 = eos(x + (h/2)*k2, u)
-    k4 = eos(x + h*k3    , u)
+    k1 = f(x           , u)
+    k2 = f(x + (h/2)*k1, u)
+    k3 = f(x + (h/2)*k2, u)
+    k4 = f(x + h*k3    , u)
     return (h/6) * (k1 + 2.0*k2 + 2.0*k3 + k4)
 
-def control_callback():
-    # 制御周期のたびに呼ばれるやつ
-    global x,t
-    u = controller()
-    x += runge_kutta(x, u, dt)
-    t += dt
+class Drone:
+    def __init__(self, controller, draw_cycle=10, interval_ms=10, T=10.0):
+        ##### 設定 ####
+        self.draw_cycle = draw_cycle    # 描画周期と制御周期の比率(整数)
+        self.interval_ms = interval_ms  # 制御周期[ms]
+        self.T = T                      # シミュレーション時間[s]
 
-def draw(y_):
+        #### 内部変数の初期化 ####
+        self.dt = interval_ms * 1e-3    # 制御周期[s]
+        self.t = 0.0                    # 現在時刻[s]
+        self.x0 = [200., 0.]            # 初期状態
+        self.x = np.array(self.x0)           # 状態
+        self.y0 = 1500.0                # 目標高さ
+        self.controller = controller    # 制御器
+
     # 描画する関数
-    black = '#'+'0'*6
-    y = int(y_)
+    def draw(self):
+        black = '#'+'0'*6
+        y = int(self.x[0])
 
-    # キャンバスの定義
-    ax = plt.axes()
-    ax.set_aspect('equal')
-    plt.xlim(0, 3000)
-    plt.ylim(0, 3000)
+        # キャンバスの定義
+        ax = plt.axes()
+        ax.set_aspect('equal')
+        plt.xlim(0, 3000)
+        plt.ylim(0, 3000)
 
-    # 地面の描写
-    field_y = 20.0+x0[0]
-    plt.plot([0,3000], [field_y, field_y], color=black)
-    c = hex(190)[2:]
-    r = patches.Rectangle(xy=(0, 0), width=3000, height=field_y, color='#'+c*3)
-    ax.add_patch(r)
+        # 地面の描写
+        field_y = 20.0+self.x0[0]
+        plt.plot([0,3000], [field_y, field_y], color=black)
+        c = hex(190)[2:]
+        r = patches.Rectangle(xy=(0, 0), width=3000, height=field_y, color='#'+c*3)
+        ax.add_patch(r)
 
-    # ドローンの目標位置の描画
-    h = 2.0
-    r = patches.Rectangle(xy=(0, y0 - h), width=3000, height=2*h, color='r')
-    ax.add_patch(r)
+        # ドローンの目標位置の描画
+        h = 2.0
+        r = patches.Rectangle(xy=(0, self.y0 - h), width=3000, height=2*h, color='r')
+        ax.add_patch(r)
 
-    # ドローンの描画
-    img = plt.imread('drone.png')[::-1]
-    C = np.zeros((3000, 3000, 4))
-    X = 114
-    Y = y+len(img) # ドローンの上端
-    if Y >= len(C): # ドローンの上端がはみ出ていたら切る
-        d = Y - len(C) + 1
-        img = img[:-d]
-        Y -= d
-    C[y:Y, X:X+len(img[0])] = img
-    plt.imshow(C)
+        # ドローンの描画
+        img = plt.imread('drone.png')[::-1]
+        C = np.zeros((3000, 3000, 4))
+        X = 114
+        Y = y+len(img) # ドローンの上端
+        if Y >= len(C): # ドローンの上端がはみ出ていたら切る
+            d = Y - len(C) + 1
+            img = img[:-d]
+            Y -= d
+        C[y:Y, X:X+len(img[0])] = img
+        plt.imshow(C)
 
-def draw_callback(data):
-    # animationでdrawするときに書く関数
-    plt.cla()
-    for i in range(draw_cycle):
-        control_callback()
-    draw(x[0])
+    ##### ドローンの定義 ####
+    # 制御周期ごとに呼ばれる
+    def control_callback(self):
+        error = self.x[0] - self.y0
+        vel = self.x[1]
+        u = self.controller(error, vel, self.dt)
+        
+        self.x += runge_kutta(eos, self.x, u, self.dt)
+        self.t += self.dt
 
-##### 系を呼んでグラフなどを出力するレイヤ ####
-def static(name, y):
-    # ドローンの写真を取る
-    draw(y)
-    plt.savefig(name)
-    plt.cla()
+    # 描画周期ごとに呼ばれる
+    def draw_callback(self):
+        # animationでdrawするときに書く関数
+        plt.cla()
+        for i in range(self.draw_cycle):
+            self.control_callback()
+        self.draw()
+    
+    ##### ドローンを出力するレイヤ ####
+    # 写真を作る
+    def take_picture(self, name):
+        self.draw()
+        plt.savefig(name)
+        plt.cla()
 
-def sim():
-    # 制御器のシミュレーションのみ
-    initialize()
-    t_,y_=[],[]
-    while t <= T:
-        control_callback()
-        t_.append(t)
-        y_.append(x[0])
-    plt.plot(t_,y_)
-    plt.plot([0,T],[y0,y0])
-    plt.show()
-    plt.cla()
+    # シミュレーションをする
+    def sim(self):
+        t_,y_=[],[]
+        while self.t <= self.T:
+            self.control_callback()
+            t_.append(self.t)
+            y_.append(self.x[0])
+        plt.plot(t_,y_)
+        plt.plot([0,self.T],[self.y0,self.y0])
+        plt.show()
+        plt.cla()
 
-def gen_gif(name):
     # ドローンの動画を作る
-    initialize()
-    draw_interval_ms = draw_cycle * interval_ms
-    ani = animation.FuncAnimation(fig, draw_callback, interval=draw_interval_ms, frames=int(T * 1000/draw_interval_ms))
-    ani.save("tmp.gif", writer="imagemagick")
-    ms = draw_interval_ns / 40.0
-    sp.run(" ".join(["convert","-delay",str(ns), "tmp.gif",name]), shell=True)
-    sp.run(" ".join(["rm", "tmp.gif"]), shell=True)
-    plt.cla()
+    def gen_gif(self, name):
+        draw_interval_ms = self.draw_cycle * self.interval_ms
+        ani = animation.FuncAnimation(fig, lambda dat:self.draw_callback(), interval=draw_interval_ms, frames=int(self.T * 1000/draw_interval_ms))
+        ani.save("tmp.gif", writer="imagemagick")
+        ns = (draw_interval_ms / 10.0) / 4.0
+        sp.run(" ".join(["convert","-delay",str(ns), "tmp.gif",name]), shell=True)
+        sp.run(" ".join(["rm", "tmp.gif"]), shell=True)
+        plt.cla()
 
 #### 動画を作る ####
 # controllerにPID controllerをセットする
@@ -133,38 +133,33 @@ class PID():
         self.Kd = Kd
         self.I = 0.0
 
-    def __call__(self):
-        y,v = x
-        error = y-y0
+    def __call__(self, error, vel, dt):
         self.I += error*dt
-        u = -self.Kp*error - self.Kd*v - self.Ki*self.I
+        u = -self.Kp*error - self.Kd*vel - self.Ki*self.I
         return u
 
 # 基本はここを書き換えて映像などを作る
 def picture():
-    # ドローンの写真を取る
-    static("world.png", x0[0])
-    
+    drone = Drone(lambda x,v,t:0.)
+    drone.take_picture("world.png")
+
 def pid():
     # pid制御
-    global T,controller
-    T = 12.0
     controller = PID()
-    gen_gif("PID.gif")
-
+    drone = Drone(controller, T=12.0)
+    drone.gen_gif("PID.gif")
+    
 def pi():
     # pi制御
-    global T,controller
-    T = 20.0
     controller = PID(Kd=0.)
-    gen_gif("PI.gif")
+    drone = Drone(controller, T=20.0)
+    drone.gen_gif("PI.gif")
 
 def p():
     # p制御
-    global T,controller
-    T = 20.0
     controller = PID(Ki=0., Kd=0.)
-    gen_gif("P.gif")
+    drone = Drone(controller, T=20.0)
+    drone.gen_gif("P.gif")
 
 if __name__ == '__main__':
     picture()
@@ -172,4 +167,3 @@ if __name__ == '__main__':
     pid()
     pi()
     p()
-
