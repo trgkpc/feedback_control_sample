@@ -24,19 +24,20 @@ class DefaultController:
         return np.array([0.0])
         
 class Pendulum:
-    def __init__(self, controller=None, draw_cycle=3, interval_ms=10, T=10.0, x0=[0., 0.2, 0., 0.], params = {}):
+    def __init__(self, controller=None, draw_cycle=3, interval_ms=10, T=10.0, x0=[0., 0.02, 0., 0.], params = {}):
         ##### 設定 ####
-        self.draw_cycle = draw_cycle    # 描画周期と制御周期の比率(整数)
-        self.interval_ms = interval_ms  # 制御周期[ms]
-        self.T = T                      # シミュレーション時間[s]
+        self.draw_cycle = int(draw_cycle)   # 描画周期と制御周期の比率(整数)
+        self.interval_ms = interval_ms      # 制御周期[ms]
+        self.T = T                          # シミュレーション時間[s]
         self.params = {
             "M":params.get("M", 2.0),
-            "m":params.get("m", 1.0),
-            "l":params.get("l", 3.0),
+            "m":params.get("m", 4.0),
+            "l":params.get("l", 2.0),
             "Dx":params.get("Dx", 0.2),
             "Dtheta":params.get("Dtheta", 0.1),
             "g":params.get("g", 9.8),
         }
+        self.noise = np.array([0.1, 0.1, 0.2, 0.2])
 
         #### 内部変数の初期化 ####
         self.dt = interval_ms * 1e-3    # 制御周期[s]
@@ -60,15 +61,9 @@ class Pendulum:
         plt.ylim(-Y, Y)
 
         black = '#'+'0'*6
-
-        # 地面の描写
-        fy = -2425
-        plt.plot([-X*1.2,X*1.2], [fy, fy], color=black)
-        h = 600
-        c = hex(190)[2:]
-        r = patches.Rectangle(xy=(-1.2*X, fy - h), width=2.4*X, height=h, color='#'+c*3)
-        ax.add_patch(r)
-
+        def triangle(p1, p2, p3, color='r'):
+            t = patches.Polygon(xy = [p1, p2, p3], fc=color)
+            ax.add_patch(t)
 
         def circle(x, y, r, color='#999999'):
             c = patches.Circle(xy=(x, y), radius=r, fc=color, ec=black)
@@ -77,6 +72,16 @@ class Pendulum:
         def rectangle(x, y, w, h, color='#999999', theta=0.0):
             r = patches.Rectangle(xy=(x, y), width=w, height=h, fc=color, ec=black, angle=(theta*180/np.pi))
             ax.add_patch(r)
+
+        # 地面の描写
+        fy = -2425
+        plt.plot([-X*1.2,X*1.2], [fy, fy], color=black)
+        h = 600
+        c = hex(190)[2:]
+        rectangle(-1.2*X, fy-h, 2.4*X, h, color='#'+c*3)
+        r0 = np.array([0., fy])
+        dr = np.array([250., -500.])
+        triangle(r0, r0+dr, r0+np.array([-1.,1.])*dr)
 
         y0 = -2000
         dy = 300
@@ -100,7 +105,7 @@ class Pendulum:
     def control_callback(self):
         u = self.controller(self.params, self.x, self.dt)
         
-        self.x += runge_kutta(lambda x,u:eos.f(x, u, self.params), self.x, u, self.dt)
+        self.x += runge_kutta(lambda x,u:eos.f(x, u, self.params)+self.noise*np.random.randn(4), self.x, u, self.dt)
         self.t += self.dt
 
     # 描画周期ごとに呼ばれる
@@ -153,9 +158,12 @@ class PID():
         return u
 
 class ExtendedLQR:
-    def __init__(self, Q, R):
-        self.Q = np.array(Q)
-        self.R = np.array(R)
+    def __init__(self, Q_, R_):
+        Q = np.array(Q_)
+        self.Q = 0.5 * (Q+Q.T)
+        R = np.array(R_)
+        self.R = 0.5 * (R+R.T)
+
 
     def __call__(self, params, state, dt):
         x_center = np.array(state)
@@ -172,22 +180,22 @@ def picture():
     pendulum.take_picture("pendulum.png")
 
 def no_control():
-    pendulum = Pendulum()
+    pendulum = Pendulum(T=10.0)
     pendulum.gen_gif("no_control.gif")
 
 def lqr():
     Q = np.array([
-        [0.4, 0.0, 0.0, 0.0],
-        [0.0, 2.0, 0.1, 0.1],
-        [0.0, 0.1, 2.0, 0.1],
-        [0.0, 0.1, 0.1, 1.2]])
+        [1.0, 0.1, 0.1, 0.1],
+        [0.1, 2.0, 0.1, 0.1],
+        [0.1, 0.1, 2.0, 0.1],
+        [0.1, 0.1, 0.1, 1.2]])
     R = np.array([
-            [0.1]])
+            [0.05]])
     controller = ExtendedLQR(Q, R)
     pendulum = Pendulum(controller=controller, T=10.0)
     pendulum.gen_gif("lqr.gif")
 
 if __name__ == '__main__':
-    #picture()
-    #no_control()
+    picture()
+    no_control()
     lqr()
