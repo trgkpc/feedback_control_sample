@@ -8,6 +8,7 @@ import matplotlib.patches as patches
 import matplotlib.animation as animation
 import subprocess as sp
 fig = plt.figure()
+vel_scale = 4.0
 
 #### 系の定義 ####
 def eos(state, u):
@@ -103,15 +104,16 @@ class Drone:
         plt.cla()
 
     # シミュレーションをする
-    def sim(self):
+    def sim(self, name):
         t_,y_=[],[]
         while self.t <= self.T:
             self.control_callback()
-            t_.append(self.t)
+            t_.append(self.t/vel_scale)
             y_.append(self.x[0])
         plt.plot(t_,y_)
-        plt.plot([0,self.T],[self.y0,self.y0])
-        plt.show()
+        plt.plot([0,self.T/vel_scale],[self.y0,self.y0])
+        plt.savefig(name)
+        plt.pause(1.0)
         plt.cla()
 
     # ドローンの動画を作る
@@ -119,10 +121,17 @@ class Drone:
         draw_interval_ms = self.draw_cycle * self.interval_ms
         ani = animation.FuncAnimation(fig, lambda dat:self.draw_callback(), interval=draw_interval_ms, frames=int(self.T * 1000/draw_interval_ms))
         ani.save("tmp.gif", writer="imagemagick")
-        ns = (draw_interval_ms / 10.0) / 4.0
+        ns = (draw_interval_ms / 10.0) / vel_scale
         sp.run(" ".join(["convert","-delay",str(ns), "tmp.gif",name]), shell=True)
         sp.run(" ".join(["rm", "tmp.gif"]), shell=True)
         plt.cla()
+
+    # simかgifかを統一的に呼び出すインターフェース
+    def __call__(self, is_sim, name):
+        if is_sim:
+            self.sim(f'{name}.png')
+        else:
+            self.gen_gif(f'{name}.gif')
 
 #### 動画を作る ####
 # controllerにPID controllerをセットする
@@ -143,26 +152,28 @@ def picture():
     drone = Drone(lambda x,v,t:0.)
     drone.take_picture("world.png")
 
+is_sim = True
+
 def pid():
     # pid制御
     controller = PID()
     drone = Drone(controller, T=12.0)
-    drone.gen_gif("PID.gif")
+    drone(is_sim, "PID")
     
 def pi():
     # pi制御
     controller = PID(Kd=0.)
     drone = Drone(controller, T=20.0)
-    drone.gen_gif("PI.gif")
+    drone(is_sim, "PI")
 
 def p():
     # p制御
     controller = PID(Ki=0., Kd=0.)
     drone = Drone(controller, T=20.0)
-    drone.gen_gif("P.gif")
+    drone(is_sim, "P")
 
 if __name__ == '__main__':
-    picture()
+    #picture()
 
     pid()
     pi()
