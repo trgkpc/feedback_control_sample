@@ -168,7 +168,7 @@ def picture():
     drone = Drone(lambda x,v,t:0.)
     drone.take_picture("world.png")
 
-is_sim = False
+is_sim = True
 
 def pid():
     # pid制御
