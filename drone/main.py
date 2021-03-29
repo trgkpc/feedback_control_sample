@@ -191,7 +191,7 @@ def p():
 def bangbang():
     # BangBang制御
     controller = BangBang()
-    drone = Drone(controller, T=12.0)
+    drone = Drone(controller, T=20.0)
     drone(is_sim, "BangBang")
 
 if __name__ == '__main__':
