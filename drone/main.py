@@ -150,12 +150,25 @@ class PID():
         u = -self.Kp*error - self.Kd*vel - self.Ki*self.I
         return u
 
+class BangBang():
+    def __init__(self, u=1500, threshold=10.):
+        self.u0 = u
+        self.u = u
+        self.threshold = threshold
+
+    def __call__(self, error, vel, dt):
+        if error > self.threshold:
+            self.u = -self.u0
+        elif error < -self.threshold:
+            self.u = self.u0
+        return self.u
+
 # 基本はここを書き換えて映像などを作る
 def picture():
     drone = Drone(lambda x,v,t:0.)
     drone.take_picture("world.png")
 
-is_sim = True
+is_sim = False
 
 def pid():
     # pid制御
@@ -175,9 +188,17 @@ def p():
     drone = Drone(controller, T=20.0)
     drone(is_sim, "P")
 
+def bangbang():
+    # BangBang制御
+    controller = BangBang()
+    drone = Drone(controller, T=12.0)
+    drone(is_sim, "BangBang")
+
 if __name__ == '__main__':
     #picture()
 
-    pid()
-    pi()
-    p()
+    #pid()
+    #pi()
+    #p()
+    bangbang()
+
