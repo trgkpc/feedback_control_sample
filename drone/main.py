@@ -151,16 +151,17 @@ class PID():
         return u
 
 class BangBang():
-    def __init__(self, u=1500, threshold=10.):
-        self.u0 = u
-        self.u = u
+    def __init__(self, uplus=1500, uminus=-0. ,threshold=25.):
+        self.uplus = uplus
+        self.uminus = uminus
+        self.u = uplus
         self.threshold = threshold
 
     def __call__(self, error, vel, dt):
         if error > self.threshold:
-            self.u = -self.u0
+            self.u = self.uminus
         elif error < -self.threshold:
-            self.u = self.u0
+            self.u = self.uplus
         return self.u
 
 # 基本はここを書き換えて映像などを作る
@@ -168,7 +169,7 @@ def picture():
     drone = Drone(lambda x,v,t:0.)
     drone.take_picture("world.png")
 
-is_sim = True
+is_sim = False
 
 def pid():
     # pid制御
