@@ -6,6 +6,7 @@ from scipy import linalg
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 import matplotlib.animation as animation
+import japanize_matplotlib
 import subprocess as sp
 fig = plt.figure()
 vel_scale = 4.0
@@ -112,6 +113,8 @@ class Drone:
             y_.append(self.x[0])
         plt.plot(t_,y_)
         plt.plot([0,self.T/vel_scale],[self.y0,self.y0])
+        plt.xlabel("時間[s]")
+        plt.ylabel("高さ[mm]")
         plt.savefig(name)
         plt.pause(1.0)
         plt.cla()
