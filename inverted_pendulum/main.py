@@ -124,15 +124,16 @@ class Pendulum:
         plt.cla()
 
     # シミュレーションをする
-    def sim(self):
+    def sim(self, name):
         t_,y_=[],[]
         while self.t <= self.T:
             self.control_callback()
             t_.append(self.t)
             y_.append(self.x[0])
         plt.plot(t_,y_)
-        plt.plot([0,self.T],[self.y0,self.y0])
-        plt.show()
+        plt.plot([0,self.T],[0., 0.])
+        plt.savefig(name)
+        plt.pause(1.0)
         plt.cla()
 
     # 倒立振子の動画を作る
@@ -141,9 +142,14 @@ class Pendulum:
         ani = animation.FuncAnimation(fig, lambda dat:self.draw_callback(), interval=draw_interval_ms, frames=int(self.T * 1000/draw_interval_ms))
         ani.save(name, writer="imagemagick")
         plt.cla()
+       
+    # シミュレーションとの統一的なインターフェース
+    def __call__(self, is_sim, name):
+        if is_sim:
+            self.sim(f'{name}.png')
+        else:
+            self.gen_gif(f'{name}.gif')
 
-
-    
 #### 動画を作る ####
 class PID():
     def __init__(self, Kp=3.0, Ki=1.0, Kd=2.0):
@@ -175,15 +181,19 @@ class ExtendedLQR:
         return u
 
 # 基本はここを書き換えて映像などを作る
+is_sim = True
 def picture():
+    print("===== picture =====")
     pendulum = Pendulum()
     pendulum.take_picture("pendulum.png")
 
 def no_control():
+    print("===== no control =====")
     pendulum = Pendulum(T=10.0)
-    pendulum.gen_gif("no_control.gif")
+    pendulum(is_sim, "no_control")
 
 def lqr():
+    print("===== lqr =====")
     Q = np.array([
         [1.0, 0.1, 0.1, 0.1],
         [0.1, 2.0, 0.1, 0.1],
@@ -193,9 +203,11 @@ def lqr():
             [0.05]])
     controller = ExtendedLQR(Q, R)
     pendulum = Pendulum(controller=controller, T=10.0)
-    pendulum.gen_gif("lqr.gif")
+    pendulum(is_sim, "lqr")
+
 
 if __name__ == '__main__':
-    picture()
+    #picture()
     no_control()
     lqr()
+
